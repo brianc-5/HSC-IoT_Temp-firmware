@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "XIAO Protocol v3 sensor"
+
+menu "Sensor cadence and HAT validation"
+
+config SENSOR_SAMPLE_INTERVAL_MS
+	int "Interval between new samples (milliseconds)"
+	default 20000
+	range 1000 16777215
+	help
+	  Interval measured from the beginning of one measurement cycle to the
+	  beginning of the next. Protocol v3 transmits this value in BTHome
+	  raw object 0x54 with a three-byte little-endian payload, so receivers
+	  do not depend on a compiled cadence.
+
+config SENSOR_ADV_BURST_MS
+	int "Advertising burst length per sample (milliseconds)"
+	default 1000
+	range 200 10000
+	help
+	  How long each cycle advertises before the radio is stopped again. At
+	  the fixed 200 ms advertising interval it directly controls the
+	  per-cycle radio cost: 1000 ms schedules about five advertising events,
+	  each transmitted on all three primary channels.
+
+	  The default preserves the previously hard-coded one-second burst. The
+	  bridge scans with a 100 ms interval and a 100 ms window, so its
+	  receiver is always on and normally captures the first event; the
+	  remaining events are redundancy against collisions and interference.
+	  Shortening the burst reduces radio energy at the cost of that
+	  redundancy. Change it only with a PPK2 measurement and a packet-loss
+	  check against the bridge's reported sequence gaps. The build also
+	  reserves 250 ms in every cycle for measurement and scheduling work.
+
+config SENSOR_HAT_REDISCOVERY_INTERVAL_MS
+	int "Bare-mode HAT rediscovery interval (milliseconds)"
+	default 300000
+	range 1000 16777215
+	help
+	  How often a device currently operating in bare mode briefly powers and
+	  probes the Logger HAT. Hot-plugging is not guaranteed, but periodic
+	  rediscovery prevents a transient startup failure from selecting bare
+	  mode permanently.
+
+config SENSOR_VSTOR_MIN_MV
+	int "Minimum plausible VSTOR (millivolts)"
+	# Keep equal to bridge MIN/MAX_PLAUSIBLE_VSTOR_MV and PROTOCOL.md.
+	default 1500
+	range 0 65534
+
+config SENSOR_VSTOR_MAX_MV
+	int "Maximum plausible VSTOR (millivolts)"
+	# Canonical inclusive band is 1500..4500 mV at both protocol ends.
+	default 4500
+	range 1 65534
+
+endmenu
+
+source "Kconfig.zephyr"

@@ -1,0 +1,98 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Logger HAT V3 mapping for xiao_ble:
+ *   D10/HAT enable = P1.15, active high
+ *   D4/SDA         = P0.04 on i2c1
+ *   D5/SCL         = P0.05 on i2c1
+ *   D1/A1/VSTOR    = P0.03 / SAADC AIN1
+ *
+ * The upstream board pinctrl owns the exact D4/D5 mapping and provides a
+ * low-power i2c1 state. This overlay adds the shared HAT-enable GPIO, names the
+ * internal-VDD and external-VSTOR ADC channels, and preserves QSPI DPD.
+ */
+
+/ {
+	zephyr,user {
+		io-channels = <&adc 7>, <&adc 1>;
+		io-channel-names = "vdd", "vstor";
+		hat-enable-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+/*
+ * The XIAO connector I2C bus is i2c1, not i2c0. Its upstream pinctrl states
+ * select P0.04/P0.05 in active mode and high-impedance low-power mode while
+ * suspended, avoiding current through the HAT's always-on 10 kOhm pull-ups.
+ */
+&i2c1 {
+	status = "okay";
+	clock-frequency = <100000>;
+};
+
+/*
+ * VBUS is read directly from POWER.USBREGSTATUS; no USB controller, class, or
+ * device stack is needed in the application.
+ */
+&usbd {
+	status = "disabled";
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	/*
+	 * Channel 7 -> internal VDD.
+	 * NRF_SAADC_VDD presents the VDD rail directly. Gain 1/6 with the
+	 * internal 0.6 V reference gives a 3.6 V full scale, and Zephyr's ADC
+	 * conversion therefore returns actual regulated VDD without an
+	 * additional input-divider correction.
+	 * The SAADC only draws current while converting; between one-shot reads
+	 * it is additionally suspended via PM_DEVICE (see main.c).
+	 */
+	channel@7 {
+		reg = <7>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
+		zephyr,input-positive = <NRF_SAADC_VDD>;
+		zephyr,resolution = <12>;
+	};
+
+	/*
+	 * Logger HAT D1/A1 is P0.03 / AIN1. The 100k/100k divider can present
+	 * 2.1 V at the ADC when VSTOR is 4.2 V, so gain 1/4 gives a 2.4 V
+	 * full-scale input with the 0.6 V internal reference. 64x oversampling
+	 * is encoded as 2^6 by Zephyr's ADC API.
+	 */
+	channel@1 {
+		reg = <1>;
+		zephyr,gain = "ADC_GAIN_1_4";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>;
+		zephyr,input-positive = <NRF_SAADC_AIN1>;
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <6>;
+	};
+};
+
+/*
+ * Ensure the P25Q16H node supports Deep Power-Down. If the upstream DTS already
+ * declares these, re-declaring identical values is harmless; if it does not,
+ * this is what makes PM_DEVICE_ACTION_SUSPEND actually send the 0xB9 DPD opcode
+ * instead of just gating the QSPI clock.
+ *
+ * Node label on xiao_ble is `p25q16h`. If a future board revision renames it,
+ * the DEVICE_DT_GET_ONE(nordic_qspi_nor) lookup in main.c still resolves, but
+ * this &p25q16h fragment would need the new label.
+ *
+ * t-enter-dpd / t-exit-dpd are the datasheet DPD entry/exit times in ns.
+ * P25Q16H: tDP ~= 3 us to enter, tRES(tDPDD) ~= 8 us to exit.
+ */
+&p25q16h {
+	has-dpd;
+	t-enter-dpd = <3000>;
+	t-exit-dpd = <8000>;
+};

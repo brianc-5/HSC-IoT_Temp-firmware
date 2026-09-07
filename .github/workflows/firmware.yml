@@ -1,0 +1,120 @@
+name: Firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  models:
+    name: Host-side models
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run deterministic models
+        run: |
+          python3 tests/test_bridge_flash_model.py
+          python3 tests/test_bridge_protocol_v3_model.py
+          python3 tests/test_bridge_boot_scan_model.py
+          python3 tests/test_sensor_adv_recovery_model.py
+
+  arduino:
+    name: Arduino ${{ matrix.sketch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sketch: bridge
+            artifact: bridge-uf2
+            release_name: HSC-Tplus-bridge-commissioning.uf2
+            built_name: bridge.ino.hex
+          - sketch: sensor-arduino
+            artifact: sensor-arduino-uf2
+            release_name: HSC-Tplus-sensor-arduino-legacy.uf2
+            built_name: sensor-arduino.ino.hex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: "1.2.2"
+      - name: Install pinned Seeed nRF52 core
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json
+          arduino-cli core update-index
+          arduino-cli core install Seeeduino:nrf52@1.1.13
+      - name: Compile
+        run: |
+          arduino-cli compile --fqbn Seeeduino:nrf52:xiaonRF52840 --output-dir build/${{ matrix.sketch }} ${{ matrix.sketch }}
+          mkdir -p dist
+          python3 "$HOME/.arduino15/packages/Seeeduino/hardware/nrf52/1.1.13/tools/uf2conv/uf2conv.py" -c -f 0xADA52840 -o dist/${{ matrix.release_name }} build/${{ matrix.sketch }}/${{ matrix.built_name }}
+      - name: Upload UF2
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.release_name }}
+          if-no-files-found: error
+
+  zephyr:
+    name: Zephyr sensor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: HSC-IoT_Temp-firmware
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Zephyr workspace
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: HSC-IoT_Temp-firmware
+          toolchains: arm-zephyr-eabi
+          sdk-version: 1.0.1
+      - name: Compile production sensor
+        run: west build -p always -b xiao_ble HSC-IoT_Temp-firmware/sensor-zephyr -d build/sensor-zephyr
+      - name: Prepare UF2
+        run: |
+          mkdir -p dist
+          cp build/sensor-zephyr/zephyr/zephyr.uf2 dist/HSC-Tplus-sensor-zephyr.uf2
+      - name: Upload UF2
+        uses: actions/upload-artifact@v4
+        with:
+          name: sensor-zephyr-uf2
+          path: dist/HSC-Tplus-sensor-zephyr.uf2
+          if-no-files-found: error
+
+  release:
+    name: Publish tagged UF2 files
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [models, arduino, zephyr]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-uf2"
+          path: release
+          merge-multiple: true
+      - name: Generate checksums
+        working-directory: release
+        run: sha256sum *.uf2 > SHA256SUMS
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" release/*.uf2 release/SHA256SUMS --verify-tag --generate-notes --title "HSC T+ Firmware ${GITHUB_REF_NAME}"

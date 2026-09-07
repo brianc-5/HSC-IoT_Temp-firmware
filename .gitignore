@@ -1,0 +1,28 @@
+# Local per-device bridge commissioning data
+bridge/bridge_config.h
+
+# Arduino output
+bridge/build/
+sensor-arduino/build/
+*.elf
+*.hex
+*.bin
+*.uf2
+*.map
+
+# Zephyr / west output
+build/
+build-*/
+.west/
+zephyr/
+modules/
+bootloader/
+tools/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+__pycache__/
+*.pyc
