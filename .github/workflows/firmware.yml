@@ -104,5 +104,6 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${GITHUB_REF_NAME}" release/*.uf2 release/SHA256SUMS --verify-tag --generate-notes --title "HSC T+ Firmware ${GITHUB_REF_NAME}"
