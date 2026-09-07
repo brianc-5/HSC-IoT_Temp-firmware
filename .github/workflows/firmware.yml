@@ -27,20 +27,8 @@ jobs:
           python3 tests/test_sensor_adv_recovery_model.py
 
   arduino:
-    name: Arduino ${{ matrix.sketch }}
+    name: Arduino bridge
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - sketch: bridge
-            artifact: bridge-uf2
-            release_name: HSC-Tplus-bridge-commissioning.uf2
-            built_name: bridge.ino.hex
-          - sketch: sensor-arduino
-            artifact: sensor-arduino-uf2
-            release_name: HSC-Tplus-sensor-arduino-legacy.uf2
-            built_name: sensor-arduino.ino.hex
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,14 +46,14 @@ jobs:
           arduino-cli core install Seeeduino:nrf52@1.1.13
       - name: Compile
         run: |
-          arduino-cli compile --fqbn Seeeduino:nrf52:xiaonRF52840 --output-dir build/${{ matrix.sketch }} ${{ matrix.sketch }}
+          arduino-cli compile --fqbn Seeeduino:nrf52:xiaonRF52840 --build-property 'recipe.objcopy.zip.pattern=/usr/bin/true' --output-dir build/bridge bridge
           mkdir -p dist
-          python3 "$HOME/.arduino15/packages/Seeeduino/hardware/nrf52/1.1.13/tools/uf2conv/uf2conv.py" -c -f 0xADA52840 -o dist/${{ matrix.release_name }} build/${{ matrix.sketch }}/${{ matrix.built_name }}
+          python3 "$HOME/.arduino15/packages/Seeeduino/hardware/nrf52/1.1.13/tools/uf2conv/uf2conv.py" -c -f 0xADA52840 -o dist/HSC-Tplus-bridge-commissioning.uf2 build/bridge/bridge.ino.hex
       - name: Upload UF2
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.release_name }}
+          name: bridge-uf2
+          path: dist/HSC-Tplus-bridge-commissioning.uf2
           if-no-files-found: error
 
   zephyr:

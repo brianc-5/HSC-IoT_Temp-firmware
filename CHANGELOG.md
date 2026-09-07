@@ -11,7 +11,8 @@
   commissioning, operation, HAT V3 wiring, power investigation, harvesting
   caveats, troubleshooting, security, and development invariants.
 - Pin Zephyr v4.4.0 / SDK 1.0.1 and Seeed nRF52 Boards 1.1.13 in CI.
-- Add tagged-release automation for all three UF2 files and SHA-256 checksums.
+- Add tagged-release automation for the production Zephyr sensor and Arduino
+  bridge UF2 files, with SHA-256 checksums.
 
 Known limitation: Logger HAT V3 sensing is functionally validated, but its
 standby power is still under investigation. Full-HAT GPIO power is documented

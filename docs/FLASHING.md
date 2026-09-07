@@ -50,8 +50,9 @@ flash an address-locked bridge as described in
 
 ## Optional legacy Arduino sensor
 
-`HSC-Tplus-sensor-arduino-legacy.uf2` is the older bare-board implementation.
-It reports MCU die temperature and VDD using the original 11-byte service-data
+The older bare-board Arduino sensor is retained as source under
+`sensor-arduino/`; no prebuilt release is published. It reports MCU die
+temperature and VDD using the original 11-byte service-data
 format. The current bridge remains compatible, but this image does not detect
 the Logger HAT, advertise configuration IDs/cadence, or provide the Zephyr
 firmware's recovery behavior. New deployments should use the Zephyr image.

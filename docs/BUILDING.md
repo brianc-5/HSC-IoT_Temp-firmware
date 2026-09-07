@@ -179,9 +179,10 @@ handling, advertisement recovery, and equivalence of optimized boot scanning.
 
 ## Reproducible release artifacts
 
-On every push, GitHub Actions builds all three UF2 files and runs the host-side
-models. Pushing a `v*` tag creates a GitHub Release with renamed UF2 assets and
-`SHA256SUMS`:
+On every push, GitHub Actions builds the production Zephyr sensor and Arduino
+bridge UF2 files and runs the host-side models. Pushing a `v*` tag creates a
+GitHub Release with renamed UF2 assets and `SHA256SUMS`. The legacy Arduino
+sensor remains a source-only compatibility implementation:
 
 ```sh
 git tag -a v0.1.0 -m "HSC T+ Firmware v0.1.0"

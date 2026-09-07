@@ -3,7 +3,7 @@
 ## Start here
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) and the frozen
-[PROTOCOL.md](PROTOCOL.md), then build all three images with
+[PROTOCOL.md](PROTOCOL.md), then build the production sensor and bridge with
 [BUILDING.md](BUILDING.md). Keep experimental hardware changes behind explicit
 configuration and do not change defaults until they have target measurements.
 
